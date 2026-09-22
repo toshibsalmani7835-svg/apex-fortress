@@ -1,89 +1,45 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from transformers import AutoProcessor, AutoModelForAudioClassification
-import torch
-import librosa
-import shutil
-import os
-
-app = FastAPI(title="Apex Fortress - Pure Neural ML Core")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-print("Loading Pure Deepfake Neural Model and Processor...")
-MODEL_NAME = "MelodyMachine/Deepfake-audio-detection"
-processor = AutoProcessor.from_pretrained(MODEL_NAME)
-model = AutoModelForAudioClassification.from_pretrained(MODEL_NAME)
-model.eval()  # Set model to evaluation mode
-
-@app.get("/")
-def read_root():
-    return {"status": "Online", "engine": "Pure Neural Network Inference"}
-
-@app.post("/api/v1/scan-voice")
-@app.post("/scan-voice")
-async def scan_voice(file: UploadFile = File(...)):
-    temp_file_path = f"temp_{file.filename}"
-    try:
-        # Save file temporarily
-        with open(temp_file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        
-        # 1. Load audio natively via librosa at standard 16kHz
-        speech_array, sampling_rate = librosa.load(temp_file_path, sr=16000, mono=True)
-        
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
-
-        # 2. Process audio through the model's official processor
-        inputs = processor(
-            speech_array, 
-            sampling_rate=16000, 
-            return_tensors="pt", 
-            padding=True
-        )
-
-        # 3. Direct Neural Network Forward Pass (Pure AI Inference)
-        with torch.no_grad():
-            outputs = model(**inputs)
-            logits = outputs.logits
-            # Convert logits to probabilities using softmax
-            probabilities = torch.softmax(logits, dim=-1)[0]
+          async function scanVoiceAIAPI() {
+            const fileInput = document.getElementById('audioInput');
+            const box = document.getElementById('resultBox');
+            if(!fileInput.files || fileInput.files.length === 0) { showToast("⚠️ Load audio sample first!", "error"); return; }
             
-        # 4. Get the exact predicted class directly from the model weights
-        predicted_class_id = torch.argmax(probabilities).item()
-        confidence_score = probabilities[predicted_class_id].item()
-        
-        # Fetch native label straight from model configuration config
-        model_label = model.config.id2label.get(predicted_class_id, str(predicted_class_id)).lower()
+            const audioFile = fileInput.files[0];
+            box.classList.remove('hidden');
+            box.className = "p-2.5 rounded-xl border bg-slate-900 border-slate-700 text-yellow-300";
+            document.getElementById('resultText').innerText = "🔄 Uploading audio to Railway backend...";
 
-        print(f"--- PURE ML INFERENCE --- Label: {model_label} | Score: {confidence_score:.4f} | Class ID: {predicted_class_id}")
+            const formData = new FormData();
+            formData.append('file', audioFile);
 
-        # Pure neural decision based strictly on model classification
-        is_deepfake = False
-        if "spoof" in model_label or "fake" in model_label or predicted_class_id == 1:
-            is_deepfake = True
-        else:
-            is_deepfake = False
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/v1/scan-voice`, {
+                    method: 'POST',
+                    body: formData
+                });
 
-        verdict_text = "AI Deepfake / Cloned Voice" if is_deepfake else "Genuine Human Voice"
-        message = f"AI Model Verdict: {verdict_text} ({confidence_score * 100:.1f}% Confidence)"
-
-        return {
-            "is_deepfake": is_deepfake,
-            "message": message,
-            "model_label": model_label,
-            "confidence": float(confidence_score)
+                if(res.ok) {
+                    const data = await res.json();
+                    scansCount++;
+                    if(data.is_deepfake) {
+                        threatsCount++;
+                        box.className = "p-2.5 rounded-xl border bg-rose-950/80 border-rose-800 text-rose-200 threat-pulse";
+                        document.getElementById('resultText').innerText = `⚠️ AI DEEPFAKE DETECTED: ${data.message}`;
+                    } else {
+                        box.className = "p-2.5 rounded-xl border bg-emerald-950/80 border-emerald-800 text-emerald-200";
+                        document.getElementById('resultText').innerText = `✅ GENUINE VOICE: ${data.message}`;
+                    }
+                    updateStats();
+                    return;
+                } else {
+                    // Agar server ne error diya toh error code screen par dikhao
+                    const errData = await res.text();
+                    box.className = "p-2.5 rounded-xl border bg-rose-950/80 border-rose-800 text-rose-200";
+                    document.getElementById('resultText').innerText = `❌ Server Error (${res.status}): ${errData}`;
+                }
+            } catch(err) {
+                // Agar internet ya connection fail hua toh yahan dikhega
+                box.className = "p-2.5 rounded-xl border bg-rose-950/80 border-rose-800 text-rose-200";
+                document.getElementById('resultText').innerText = `❌ Connection Failed: ${err.message}. (Railway server shyd sleep mode me ho ya offline ho)`;
+            }
         }
-
-    except Exception as e:
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
-        print("ERROR:", str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+      
