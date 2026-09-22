@@ -3,7 +3,9 @@ uvicorn
 librosa
 soundfile
 numpy
-python-multipart
+torch
+transformers
+
 
 
 
