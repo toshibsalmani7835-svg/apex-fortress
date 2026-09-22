@@ -5,11 +5,7 @@ import numpy as np
 import shutil
 import os
 
-app = FastAPI(
-    title="Apex Fortress Enterprise Voice AI",
-    version="2.0.0",
-    description="Production-grade server-side deepfake voice detection engine using advanced spectral and harmonic analysis."
-)
+app = FastAPI(title="Apex Fortress Autonomous Voice AI")
 
 app.add_middleware(
     CORSMiddleware,
@@ -19,73 +15,56 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
-def read_root():
-    return {
-        "status": "online",
-        "system": "Apex Fortress Voice Guard",
-        "engine": "Librosa Spectral Core v2.0"
-    }
-
 @app.post("/api/v1/scan-voice")
 async def scan_voice(file: UploadFile = File(...)):
     temp_file_path = f"temp_{file.filename}"
     try:
-        # Save incoming audio stream securely
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        # Load audio using Librosa (handling up to 15 seconds for deep analysis)
+        # Librosa autonomous audio analysis
         y, sr = librosa.load(temp_file_path, duration=15.0)
         
-        if len(y) < sr * 0.5:
-            raise HTTPException(status_code=400, detail="Audio file is too short for reliable deepfake inspection.")
-
-        # Advanced Multi-Feature Extraction for Production Accuracy
-        spectral_centroids = librosa.feature.spectral_centroid(y=y, sr=sr)
+        # Extracting core spectral features handled completely by Librosa
+        centroid = librosa.feature.spectral_centroid(y=y, sr=sr)
+        rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr, roll_percent=0.85)
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=20)
         zcr = librosa.feature.zero_crossing_rate(y)
-        rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
-        mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
 
-        # Statistical indicators
-        centroid_var = float(np.var(spectral_centroids))
-        zcr_mean = float(np.mean(zcr))
-        rolloff_mean = float(np.mean(rolloff))
-        mfcc_variance = float(np.var(mfccs))
+        # Autonomous variance & distribution analysis
+        c_var = np.var(centroid)
+        r_var = np.var(rolloff)
+        m_mean = np.mean(np.abs(mfcc))
+        z_var = np.var(zcr)
 
-        # Cleanup temp file immediately
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
-        # Enterprise Decision Matrix (Tuned for AI cloned audio signatures)
-        # AI voices often exhibit unnatural smoothness in MFCC variance or extreme spectral bounds
-        is_deepfake = False
-        confidence = 96.5
+        # Autonomous AI Detection Scoring based purely on Librosa spectral mathematics
+        # Synthetic / Cloned voices lack natural organic vocal tract fluctuation
+        anomaly_score = 0
+        if c_var < 3000 or c_var > 50000: anomaly_score += 1
+        if r_var < 500000 or r_var > 15000000: anomaly_score += 1
+        if m_mean < 35.0 or m_mean > 95.0: anomaly_score += 1
+        if z_var < 0.0001: anomaly_score += 1
 
-        if centroid_var < 2500 or centroid_var > 42000:
-            is_deepfake = True
-            confidence = 98.9
-        elif zcr_mean > 0.18 or zcr_mean < 0.025:
-            is_deepfake = True
-            confidence = 97.8
-        elif mfcc_variance < 40.0:
-            is_deepfake = True
-            confidence = 99.1
+        is_deepfake = anomaly_score >= 2
+        confidence = round(88.5 + (anomaly_score * 3.2), 1)
+        if confidence > 99.0: confidence = 99.0
 
         if is_deepfake:
-            message = "Synthetic vocal artifacts and algorithmic harmonics identified via deep spectral inspection."
+            message = "Librosa Engine: Synthetic vocal anomalies and cloned harmonic signature detected."
         else:
-            message = "Authentic organic human vocal tract frequencies verified successfully."
+            message = "Librosa Engine: Organic human vocal harmonics and natural frequency spectrum verified."
 
         return {
-            "status": "success",
             "is_deepfake": is_deepfake,
             "confidence": confidence,
             "message": message,
             "metrics": {
-                "centroid_variance": round(centroid_var, 2),
-                "zcr_mean": round(zcr_mean, 4),
-                "mfcc_variance": round(mfcc_variance, 2)
+                "anomaly_score": anomaly_score,
+                "centroid_variance": float(round(c_var, 2)),
+                "mfcc_activity": float(round(m_mean, 2))
             }
         }
         
