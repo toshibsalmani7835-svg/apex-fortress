@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apex Fortress - AI Security Suite</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between">
+
+    <!-- Header / Navbar -->
+    <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 p-4 sticky top-0 z-50 flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+            <div class="w-3 h-3 bg-emerald-500 rounded-full animate-ping"></div>
+            <h1 class="text-lg font-bold tracking-wider text-emerald-400">APEX FORTRESS</h1>
+        </div>
+        <span class="text-xs bg-slate-800 border border-slate-700 px-2.5 py-1 rounded-full text-slate-300">FastAPI Active 🚀</span>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 p-4 max-w-md w-full mx-auto space-y-6">
+        
+        <!-- Welcome Card -->
+        <div class="bg-gradient-to-br from-slate-900 to-slate-900/50 border border-slate-800 p-5 rounded-2xl shadow-xl">
+            <h2 class="text-xl font-bold text-white mb-1">Voice & Threat Guard</h2>
+            <p class="text-xs text-slate-400">Real-time deepfake audio inspection and fraud pattern analyzer powered by FastAPI.</p>
+        </div>
+
+        <!-- Section 1: Voice Deepfake Engine -->
+        <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-lg space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="font-semibold text-sm text-slate-200">🎙️ Voice Deepfake Scanner</h3>
+                <span class="text-[10px] text-emerald-400 bg-emerald-950/50 border border-emerald-800 px-2 py-0.5 rounded">Live Engine</span>
+            </div>
+            
+            <div class="border-2 border-dashed border-slate-700 hover:border-emerald-500 transition rounded-xl p-4 text-center cursor-pointer relative">
+                <input type="file" id="audioFile" accept="audio/*" class="absolute inset-0 opacity-0 cursor-pointer">
+                <p class="text-xs text-slate-400" id="fileNameDisplay">Tap or drop audio file here (e.g., test.wav)</p>
+            </div>
+
+            <button onclick="scanVoiceFile()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition shadow-lg shadow-emerald-900/20">
+                Analyze Audio Signature
+            </button>
+
+            <div id="voiceResult" class="hidden p-3 rounded-xl text-xs font-medium border"></div>
+        </div>
+
+        <!-- Section 2: Threat & Pattern Detector -->
+        <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-lg space-y-4">
+            <h3 class="font-semibold text-sm text-slate-200">🛡️ Text / Payload Threat Guard</h3>
+            
+            <input type="text" id="threatInput" placeholder="Enter text, URL or SMS payload to check..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+
+            <button onclick="scanThreatText()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-2.5 rounded-xl text-xs transition border border-slate-700">
+                Inspect Payload
+            </button>
+
+            <div id="threatResult" class="hidden p-3 rounded-xl text-xs font-medium border"></div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center py-4 text-[10px] text-slate-500 border-t border-slate-900">
+        Apex Fortress Security Core v7.0 &bull; Secured System
+    </footer>
+
+    <!-- JavaScript Logic connecting to FastAPI -->
+    <script>
+        // File selection name update
+        const fileInput = document.getElementById('audioFile');
+        fileInput.addEventListener('change', (e) => {
+            if(e.target.files.length > 0) {
+                document.getElementById('fileNameDisplay').innerText = "Selected: " + e.target.files[0].name;
+            }
+        });
+
+        async function scanVoiceFile() {
+            const fileInput = document.getElementById('audioFile');
+            const resultDiv = document.getElementById('voiceResult');
+
+            if (fileInput.files.length === 0) {
+                alert("Pehle koi audio file select karein!");
+                return;
+            }
+
+            resultDiv.classList.remove('hidden');
+            resultDiv.className = "p-3 rounded-xl text-xs font-medium border bg-slate-950 text-slate-400 border-slate-800";
+            resultDiv.innerText = "Analyzing audio harmonics via FastAPI server...";
+
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            try {
+                const response = await fetch('/api/scan-voice', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                resultDiv.classList.remove('hidden');
+                if (data.status === 'threat') {
+                    resultDiv.className = "p-3 rounded-xl text-xs font-medium border bg-rose-950/40 text-rose-300 border-rose-800/60";
+                } else {
+                    resultDiv.className = "p-3 rounded-xl text-xs font-medium border bg-emerald-950/40 text-emerald-300 border-emerald-800/60";
+                }
+                resultDiv.innerText = data.message;
+            } catch (err) {
+                resultDiv.className = "p-3 rounded-xl text-xs font-medium border bg-rose-950/40 text-rose-300 border-rose-800/60";
+                resultDiv.innerText = "❌ Error connecting to FastAPI backend server.";
+            }
+        }
+
+        async function scanThreatText() {
+            const payloadText = document.getElementById('threatInput').value.trim();
+            const resultDiv = document.getElementById('threatResult');
+
+            if (!payloadText) {
+                alert("Kuch text ya payload toh enter karein!");
+                return;
+            }
+
+            resultDiv.classList.remove('hidden');
+            resultDiv.className = "p-3 rounded-xl text-xs font-medium border bg-slate-950 text-slate-400 border-slate-800";
+            resultDiv.innerText = "Scanning payload signature...";
+
+            const formData = new URLSearchParams();
+            formData.append("payload", payloadText);
+
+            try {
+                const response = await fetch('/api/scan-threat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+                const data = await response.json();
+
+                resultDiv.classList.remove('hidden');
+                if (data.status === 'threat') {
+                    resultDiv.className = "p-3 rounded-xl text-xs font-medium border bg-rose-950/40 text-rose-300 border-rose-800/60";
+                } else {
+                    resultDiv.className = "p-3 rounded-xl text-xs font-medium border bg-emerald-950/40 text-emerald-300 border-emerald-800/60";
+                }
+                resultDiv.innerText = data.message;
+            } catch (err) {
+                resultDiv.className = "p-3 rounded-xl text-xs font-medium border bg-rose-950/40 text-rose-300 border-rose-800/60";
+                resultDiv.innerText = "❌ Error communicating with FastAPI backend.";
+            }
+        }
+    </script>
+</body>
+</html>
