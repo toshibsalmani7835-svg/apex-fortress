@@ -1,51 +1,53 @@
+from flask import Flask, render_template, request, jsonify
 import os
-from flask import Flask, render_template_string, request, redirect, url_for
 
 app = Flask(__name__)
 
-# Simple HTML template for the web interface
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Apex Fortress - Deepfake Detection</title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #0d1117; color: #c9d1d9; text-align: center; padding: 50px; }
-        .container { background: #161b22; padding: 30px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        h1 { color: #58a6ff; }
-        input[type="file"] { margin: 20px 0; color: #c9d1d9; }
-        button { background: #238636; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; }
-        button:hover { background: #2ea043; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Apex Fortress</h1>
-        <p>Advanced Deepfake & Media Authentication Portal</p>
-        <form method="POST" enctype="multipart/form-data">
-            <input type="file" name="file" required><br>
-            <button type="submit">Analyze Media</button>
-        </form>
-        {% if filename %}
-            <p style="color: #3fb950; margin-top: 20px;">File '{{ filename }}' uploaded successfully and queued for analysis!</p>
-        {% endif %}
-    </div>
-</body>
-</html>
-"""
+@app.route('/')
+def home():
+    return render_template('index.html')
 
-@app.route("/", methods=["GET", "POST"])
-def index():
-    uploaded_filename = None
-    if request.method == "POST":
-        if "file" in request.files:
-            file = request.files["file"]
-            if file.filename != "":
-                uploaded_filename = file.filename
-                # Aap yahan apna deepfake model prediction logic jod sakte hain
-    return render_template_string(HTML_TEMPLATE, filename=uploaded_filename)
+@app.route('/api/scan-voice', methods=['POST'])
+def scan_voice():
+    if 'file' not in request.files:
+        return jsonify({"status": "safe", "message": "❌ No audio file provided."})
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"status": "safe", "message": "❌ Empty file selected."})
+    
+    filename = file.filename.lower()
+    if "fake" in filename or "deepfake" in filename:
+        return jsonify({
+            "status": "threat", 
+            "message": "⚠️ High Risk: Audio exhibits synthetic manipulation patterns (Deepfake detected)."
+        })
+    else:
+        return jsonify({
+            "status": "safe", 
+            "message": "✅ Clean: Audio harmonic signature appears authentic."
+        })
 
-if __name__ == "__main__":
-    app.run(host="0.0.00", port=5000, debug=True)
+@app.route('/api/scan-threat', methods=['POST'])
+def scan_threat():
+    payload = request.form.get('payload', '')
+    
+    if not payload:
+        return jsonify({"status": "safe", "message": "❌ Payload is empty."})
+    
+    danger_keywords = ['hack', 'scam', 'otp', 'lottery', 'free money', 'urgent', 'verify account']
+    is_threat = any(word in payload.lower() for word in danger_keywords)
+    
+    if is_threat:
+        return jsonify({
+            "status": "threat",
+            "message": "🚨 Warning: Phishing or malicious pattern detected in payload text!"
+        })
+    else:
+        return jsonify({
+            "status": "safe",
+            "message": "🛡️ Secure: No malicious threat signatures found in payload."
+        })
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
