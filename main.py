@@ -1,11 +1,17 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import librosa
-import numpy as np
-import shutil
+import torch
+import torch.nn.functional as F
+from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2ForSequenceClassification
 import os
+import shutil
 
-app = FastAPI(title="Apex Fortress Autonomous Voice AI")
+app = FastAPI(
+    title="Apex Fortress Enterprise Beast Engine",
+    version="3.0.0",
+    description="Heavy-duty production transformer model for enterprise-grade audio deepfake detection."
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,59 +21,84 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Loading Heavy-Duty State-of-the-Art Deepfake Audio Classifier
+MODEL_ID = "MelodyMachine/Deepfake-audio-detection"
+print("🚀 Loading Beast-Mode Audio Transformer Model...")
+
+try:
+    feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(MODEL_ID)
+    model = Wav2Vec2ForSequenceClassification.from_pretrained(MODEL_ID)
+    model.eval()
+    print("🔥 Beast Model Loaded Successfully & Ready for Combat!")
+except Exception as e:
+    print(f"❌ Error loading heavy model: {e}")
+    model = None
+    feature_extractor = None
+
+@app.get("/")
+def home():
+    return {"status": "online", "engine": "Apex Fortress Heavy Transformer Core v3.0"}
+
 @app.post("/api/v1/scan-voice")
 async def scan_voice(file: UploadFile = File(...)):
     temp_file_path = f"temp_{file.filename}"
     try:
+        # Securely save incoming audio stream
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        # Librosa autonomous audio analysis
-        y, sr = librosa.load(temp_file_path, duration=15.0)
+        # Load audio strictly at 16kHz (Mandatory for Transformer audio models)
+        y, sr = librosa.load(temp_file_path, duration=5.0, sr=16000)
         
-        # Extracting core spectral features handled completely by Librosa
-        centroid = librosa.feature.spectral_centroid(y=y, sr=sr)
-        rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr, roll_percent=0.85)
-        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=20)
-        zcr = librosa.feature.zero_crossing_rate(y)
+        if len(y) < sr * 0.4:
+            raise HTTPException(status_code=400, detail="Audio file is too short for deep neural inspection.")
 
-        # Autonomous variance & distribution analysis
-        c_var = np.var(centroid)
-        r_var = np.var(rolloff)
-        m_mean = np.mean(np.abs(mfcc))
-        z_var = np.var(zcr)
+        if model is None or feature_extractor is None:
+            raise HTTPException(status_code=500, detail="Neural model not initialized on server.")
 
+        # Process audio through Wav2Vec2 Feature Extractor
+        inputs = feature_extractor(
+            y, 
+            sampling_rate=16000, 
+            return_tensors="pt", 
+            padding=True
+        )
+
+        # Run inference through the neural network
+        with torch.no_grad():
+            outputs = model(**inputs)
+            logits = outputs.logits
+            probabilities = F.softmax(logits, dim=-1)
+
+        # Extract confidence scores
+        probs = probabilities[0].tolist()
+        spoof_score = float(probs[-1]) * 100
+        real_score = float(probs[0]) * 100
+
+        # Decision threshold
+        is_deepfake = spoof_score > 50.0
+        confidence = round(spoof_score if is_deepfake else real_score, 2)
+        
+        # Cleanup temp file instantly
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
-        # Autonomous AI Detection Scoring based purely on Librosa spectral mathematics
-        # Synthetic / Cloned voices lack natural organic vocal tract fluctuation
-        anomaly_score = 0
-        if c_var < 3000 or c_var > 50000: anomaly_score += 1
-        if r_var < 500000 or r_var > 15000000: anomaly_score += 1
-        if m_mean < 35.0 or m_mean > 95.0: anomaly_score += 1
-        if z_var < 0.0001: anomaly_score += 1
-
-        is_deepfake = anomaly_score >= 2
-        confidence = round(88.5 + (anomaly_score * 3.2), 1)
-        if confidence > 99.0: confidence = 99.0
-
         if is_deepfake:
-            message = "Librosa Engine: Synthetic vocal anomalies and cloned harmonic signature detected."
+            message = f"🚨 AI SPOOF DETECTED: Synthetic neural vocoder or cloned voice signature identified (Risk: {confidence}%)."
         else:
-            message = "Librosa Engine: Organic human vocal harmonics and natural frequency spectrum verified."
+            message = f"✅ AUTHENTIC VOICE: Organic human vocal tract harmonics verified (Confidence: {confidence}%)."
 
         return {
+            "status": "success",
             "is_deepfake": is_deepfake,
             "confidence": confidence,
             "message": message,
-            "metrics": {
-                "anomaly_score": anomaly_score,
-                "centroid_variance": float(round(c_var, 2)),
-                "mfcc_activity": float(round(m_mean, 2))
+            "raw_probabilities": {
+                "spoof_percentage": round(spoof_score, 2),
+                "real_percentage": round(real_score, 2)
             }
         }
-        
+
     except Exception as e:
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
