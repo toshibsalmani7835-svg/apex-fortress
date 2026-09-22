@@ -28,42 +28,47 @@ def read_root():
 async def scan_voice(file: UploadFile = File(...)):
     temp_file_path = f"temp_{file.filename}"
     try:
-        # File save karo
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        # Librosa se audio load karo aur 16kHz par resample karo (Model ke liye best hota hai)
+        # Audio load karke 16kHz par resample karo
         audio_array, sample_rate = librosa.load(temp_file_path, sr=16000)
-        
-        # Model ko direct numpy array pass karo librosa processing ke baad
         results = detector({"array": audio_array, "sampling_rate": sample_rate})
         
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
             
-        print("LIBROSA MODEL RESULTS:", results)
+        print("--- RAW MODEL RESULTS ---", results)
         
         is_deepfake = False
-        highest_score = 0.0
-        detected_label = "unknown"
+        top_label = "unknown"
+        top_score = 0.0
         
         for res in results:
             label = res.get("label", "").lower()
             score = res.get("score", 0.0)
-            if score > highest_score:
-                highest_score = score
-                detected_label = label
-            
-            # Check labels
-            if "fake" in label or "spoof" in label or "ai" in label or "synthetic" in label:
-                if score > 0.35:
-                    is_deepfake = True
+            if score > top_score:
+                top_score = score
+                top_label = label
 
-        # Agar model 'real' bol raha hai par confidence kam hai, toh doubt rakho
-        if "real" in detected_label and highest_score < 0.65:
-            is_deepfake = True
+        # ASVspoof / MelodyMachine models use 'spoof' for fake and 'bonafide' for real
+        if "spoof" in top_label or "fake" in top_label or "synthetic" in top_label or "ai" in top_label:
+            if top_score > 0.25: # Strict check for fake
+                is_deepfake = True
+        elif "bonafide" in top_label or "real" in top_label:
+            if top_score < 0.6: # Agar real hone ka confidence bhi kam hai toh doubt maano
+                is_deepfake = True
+            else:
+                is_deepfake = False
 
-        message = f"Result: {detected_label.upper()} ({highest_score * 100:.1f}% confidence)"
+        # Secondary sweep for safety
+        for res in results:
+            lbl = res.get("label", "").lower()
+            scr = res.get("score", 0.0)
+            if ("spoof" in lbl or "fake" in lbl) and scr > 0.35:
+                is_deepfake = True
+
+        message = f"Model Output: {top_label.upper()} ({top_score * 100:.1f}%)"
         
         return {
             "is_deepfake": is_deepfake,
